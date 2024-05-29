@@ -183,11 +183,9 @@ def convert_rigify_rig(original_rig, original_mesh, original_actions, root_bone_
         new_constraint.target = original_rig
         new_constraint.subtarget = pose_bone.name
     
-    created_actions = []
-
     for action in original_actions:
-        original_rig.animation_data_clear()
-        original_rig.animation_data_create()
+        if original_rig.animation_data == None:
+            original_rig.animation_data_create()
         original_rig.animation_data.action = action
         created_rig.animation_data_clear()
         frame_range = (math.floor(action.frame_range[0]), math.ceil(action.frame_range[1]))
@@ -222,30 +220,29 @@ def convert_rigify_rig(original_rig, original_mesh, original_actions, root_bone_
             if action_index > -1:
                 bpy.data.actions.remove(bpy.data.actions[action_index])
 
-        created_rig.animation_data.action.name = f"{old_name}_Converted"
-        created_rig.animation_data.action.use_fake_user = True
-        created_actions.append(created_rig.animation_data.action)
+        created_action = created_rig.animation_data.action
+        created_action.name = new_name
+        created_action.use_fake_user = True
+
+        # Remove curves that don't have a bone.
+        pending_removal = [
+            fcurve for fcurve in created_action.fcurves
+            if not any(
+                (bone.name in fcurve.data_path) for bone in created_rig.data.bones
+            )
+        ]
+        for x in pending_removal:
+            action.fcurves.remove(x)
     
+    original_rig.animation_data_clear()
+    created_rig.animation_data_clear()
+
     # Remove constraints
     for pose_bone in created_rig.pose.bones:
         while len(pose_bone.constraints) > 0:
             pose_bone.constraints.remove(pose_bone.constraints[0])
     
     bpy.ops.object.mode_set(mode = "OBJECT")
-
-    #
-    # Delete curves that don't have a bone.
-    #
-
-    for action in created_actions:
-        pending_removal = [
-            fcurve for fcurve in action.fcurves
-            if not any(
-                (bone.name in fcurve.data_path) for bone in created_rig.data.bones
-                )
-            ]
-        for x in pending_removal:
-            action.fcurves.remove(x)
 
     #
     # Rename bones.
@@ -262,11 +259,17 @@ def convert_rigify_rig(original_rig, original_mesh, original_actions, root_bone_
     for action in bpy.data.actions:
         for fcurve in action.fcurves:
             fcurve.data_path = fcurve.data_path.replace("DEF-", "")
-    for action in bpy.data.actions:
         for group in action.groups:
             group.name = group.name.replace("DEF-", "")
 
     # Rename root.
     created_rig.data.edit_bones[root_bone_name].name = "root"
+
+    # Rename root in action channel names.
+    for action in bpy.data.actions:
+        for fcurve in (x for x in action.fcurves if root_bone_name in x.data_path):
+            fcurve.data_path = fcurve.data_path.replace(root_bone_name, "root")
+        for group in (x for x in action.groups if root_bone_name in x.name):
+            group.name = group.name.replace(root_bone_name, "root")
 
     bpy.ops.object.mode_set(mode = "OBJECT")
