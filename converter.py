@@ -11,22 +11,45 @@ class ActionGroup:
         self.name = name
         self.actions = defaultdict(set)
 
-def convert_rigify_rig(original_rig, original_mesh, original_actions, root_bone_name):
-    """
-    @param original_rig: The rigify rig that will be converted.
-    @param original_mesh: The mesh that is parented to the rig being converted.
-    @param rig_actions_dict: List of actions that will be converted.
-    @param root_bone_name: Name of the bone that will be the root bone after conversion.
-    """
-
+def convert_rigify_rig(original_rig, original_mesh, original_actions, root_bone_name, overwrite_objects, overwrite_actions):
     if not misc.is_rigify_rig(original_rig):
         raise RigConverterException("Can only convert a rigify rig.")
 
     new_rig_name = f"Armature"
+    new_armature_data_name = new_rig_name
     new_mesh_name = f"{original_mesh.name}_Converted"
+    new_mesh_data_name = new_mesh_name
 
     if not bpy.context.mode == "OBJECT":
         bpy.ops.object.mode_set(mode="OBJECT")
+
+    #
+    # Find and remove existing objects with the same names that are being created in this script.
+    #
+
+    if overwrite_objects:
+        pending_removal = set()
+        found_rig_index = bpy.data.objects.find(new_rig_name)
+        if found_rig_index > -1:
+            pending_removal.add(bpy.data.objects[found_rig_index])
+        found_mesh_index = bpy.data.objects.find(new_mesh_name)
+        if found_mesh_index > -1:
+            pending_removal.add(bpy.data.objects[found_mesh_index])
+
+        # Remove objects, including children.
+        for x in pending_removal:
+            for child in x.children:
+                pending_removal.add(child)
+        for x in pending_removal:
+            bpy.data.objects.remove(x)
+        
+        # Remove data.
+        armature_data_index = bpy.data.armatures.find(new_armature_data_name)
+        if armature_data_index > -1:
+            bpy.data.armatures.remove(bpy.data.armatures[armature_data_index])
+        mesh_data_index = bpy.data.meshes.find(new_mesh_data_name)
+        if mesh_data_index > -1:
+            bpy.data.meshes.remove(bpy.data.meshes[mesh_data_index])
 
     #
     # Get bone rolls.
@@ -49,7 +72,7 @@ def convert_rigify_rig(original_rig, original_mesh, original_actions, root_bone_
     # Create new rig object.
     #
 
-    created_armature_data = bpy.data.armatures.new(new_rig_name)
+    created_armature_data = bpy.data.armatures.new(new_armature_data_name)
     created_rig = bpy.data.objects.new(new_rig_name, created_armature_data)
     bpy.context.scene.collection.objects.link(created_rig)
 
@@ -125,6 +148,7 @@ def convert_rigify_rig(original_rig, original_mesh, original_actions, root_bone_
 
     created_mesh = bpy.data.objects.new(new_mesh_name, original_mesh.data.copy())
     bpy.context.scene.collection.objects.link(created_mesh)
+    created_mesh.data.name = new_mesh_data_name
 
     # Make linked data local.
     bpy.ops.object.select_all(action="DESELECT")
@@ -190,6 +214,14 @@ def convert_rigify_rig(original_rig, original_mesh, original_actions, root_bone_
 
         # Rename the created action.
         old_name = action.name
+        new_name = f"{old_name}_Converted"
+
+        # If an action with the same name exists, remove it.
+        if overwrite_actions:
+            action_index = bpy.data.actions.find(new_name)
+            if action_index > -1:
+                bpy.data.actions.remove(bpy.data.actions[action_index])
+
         created_rig.animation_data.action.name = f"{old_name}_Converted"
         created_rig.animation_data.action.use_fake_user = True
         created_actions.append(created_rig.animation_data.action)

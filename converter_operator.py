@@ -15,15 +15,44 @@ def depsgraph_update_handler(scene):
         rig_property = bpy.context.scene.rigify_converter.rigs_to_convert.add()
         rig_property.rig_object = rig_object
 
+class UIActionList(bpy.types.UIList):
+    def draw_item(self, context, layout, data, item, icon, active_data, active_propname):
+        if self.layout_type in {"DEFAULT", "COMPACT", "GRID"}:
+            row = layout.row(align=True)
+            row.alignment = "LEFT"
+            row.prop(data=item, property="include_in_export", icon_only=True)
+            row.label(text=item.name, icon_value=icon)
+
 #
 # Property classes.
 #
+
+class ActionSelectionProperty(bpy.types.PropertyGroup):
+    name: bpy.props.StringProperty()
+    include_in_export: bpy.props.BoolProperty(default=False)
 
 class RigObjectProperty(bpy.types.PropertyGroup):
     rig_object: bpy.props.PointerProperty(type = bpy.types.Object)
 
 class RigifyConverterProperties(bpy.types.PropertyGroup):
     rigs_to_convert: bpy.props.CollectionProperty(type = RigObjectProperty)
+    add_as_root_bone: bpy.props.StringProperty(
+        default="root",
+        name="Add as root bone",
+        description="Bone that will be added to the converted rig as the root bone"
+    )
+    actions: bpy.props.CollectionProperty(type=ActionSelectionProperty)
+    active_action_index: bpy.props.IntProperty()
+    overwrite_existing_objects: bpy.props.EnumProperty(
+        name="Overwrite",
+        items=(
+            ("NONE", "None", ""),
+            ("OBJECTS", "Objects", ""),
+            ("ACTIONS", "Actions", ""),
+            ("BOTH", "Objects and actions", ""),
+        ),
+        default="BOTH",
+    )
 
 #
 # Operators.
@@ -35,12 +64,6 @@ class RigifyConverterOperator(bpy.types.Operator):
     bl_description = "Convert selected rigify armature, its mesh, and all actions in scene"
     bl_options = {"REGISTER"}
 
-    add_as_root_bone : bpy.props.StringProperty(
-        default="root",
-        name="Add as root bone",
-        description="Bone that will be added to the converted rig as the root bone"
-    )
-
     @classmethod
     def poll(cls, context):
         if len(context.scene.rigify_converter.rigs_to_convert) <= 0: return False
@@ -50,7 +73,8 @@ class RigifyConverterOperator(bpy.types.Operator):
         return True
 
     def execute(self, context):
-        for rig_object in (x.rig_object for x in bpy.context.scene.rigify_converter.rigs_to_convert):
+        properties = context.scene.rigify_converter
+        for rig_object in (x.rig_object for x in properties.rigs_to_convert):
             child_meshes = [x for x in rig_object.children if x.type == "MESH"]
             if len(child_meshes) > 1:
                 self.report({"ERROR"}, "Can't convert a rig that is the parent of multiple meshes.")
@@ -58,11 +82,54 @@ class RigifyConverterOperator(bpy.types.Operator):
             if len(child_meshes) < 1:
                 self.report({"ERROR"}, "Can't convert a rig that is not the parent of any mesh.")
                 return {"CANCELLED"}
-            converter.convert_rigify_rig(rig_object, child_meshes[0], [x for x in bpy.data.actions], self.add_as_root_bone)
+            actions = [bpy.data.actions[x.name] for x in properties.actions if x.include_in_export]
+
+            overwrite_objects = properties.overwrite_existing_objects in {"OBJECTS", "BOTH"}
+            overwrite_actions = properties.overwrite_existing_objects in {"ACTIONS", "BOTH"}
+            converter.convert_rigify_rig(
+                rig_object,
+                child_meshes[0],
+                actions,
+                properties.add_as_root_bone,
+                overwrite_objects,
+                overwrite_actions,
+            )
         return {"FINISHED"}
 
     def invoke(self, context, event):
+        properties = bpy.context.scene.rigify_converter
+        properties.active_action_index = 0
+
+        # Remove action properties for actions that don't exist anymore.
+        pending_removal = []
+        for action_property in properties.actions:
+            if action_property.name not in [x.name for x in bpy.data.actions]:
+                pending_removal.append(action_property)
+        for x in pending_removal:
+            properties.actions.remove(x)
+
+        # Add missing actions as new properties.
+        for action in bpy.data.actions:
+            if action.name not in [x.name for x in properties.actions]:
+                new_action_property = properties.actions.add()
+                new_action_property.name = action.name
+
         return context.window_manager.invoke_props_dialog(self)
+    
+    def draw(self, context):
+        layout = self.layout
+        properties = bpy.context.scene.rigify_converter
+        layout.prop(data=properties, property="add_as_root_bone")
+        layout.template_list(
+            listtype_name="UIActionList",
+            list_id="",
+            dataptr=properties,
+            propname="actions",
+            active_dataptr=properties,
+            active_propname="active_action_index",
+            type="DEFAULT",
+        )
+        layout.prop(data=properties, property="overwrite_existing_objects")
 
 #
 # Registration.
@@ -72,6 +139,7 @@ def menu_func(self, context):
     self.layout.operator(RigifyConverterOperator.bl_idname, text=RigifyConverterOperator.bl_label)
 
 classes = (
+    ActionSelectionProperty,
     RigObjectProperty,
     RigifyConverterProperties,
     RigifyConverterOperator,
