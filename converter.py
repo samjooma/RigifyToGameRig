@@ -183,6 +183,7 @@ def convert_rigify_rig(original_rig, original_mesh, original_actions, root_bone_
         new_constraint.target = original_rig
         new_constraint.subtarget = pose_bone.name
     
+    created_actions = []
     for action in original_actions:
         if original_rig.animation_data == None:
             original_rig.animation_data_create()
@@ -233,6 +234,8 @@ def convert_rigify_rig(original_rig, original_mesh, original_actions, root_bone_
         ]
         for x in pending_removal:
             action.fcurves.remove(x)
+
+        created_actions.append(created_action)
     
     original_rig.animation_data_clear()
     created_rig.animation_data_clear()
@@ -256,7 +259,7 @@ def convert_rigify_rig(original_rig, original_mesh, original_actions, root_bone_
             edit_bone.name = misc.replace_prefix(edit_bone.name, "DEF-", "")
 
     # Remove DEF prefix from action channel names.
-    for action in bpy.data.actions:
+    for action in created_actions:
         for fcurve in action.fcurves:
             fcurve.data_path = fcurve.data_path.replace("DEF-", "")
         for group in action.groups:
@@ -266,7 +269,7 @@ def convert_rigify_rig(original_rig, original_mesh, original_actions, root_bone_
     created_rig.data.edit_bones[root_bone_name].name = "root"
 
     # Rename root in action channel names.
-    for action in bpy.data.actions:
+    for action in created_actions:
         for fcurve in (x for x in action.fcurves if root_bone_name in x.data_path):
             fcurve.data_path = fcurve.data_path.replace(root_bone_name, "root")
         for group in (x for x in action.groups if root_bone_name in x.name):
