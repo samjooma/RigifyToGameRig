@@ -11,7 +11,7 @@ class ActionGroup:
         self.name = name
         self.actions = defaultdict(set)
 
-def convert_rigify_rig(original_rig, original_mesh, original_actions, root_bone_name, overwrite_objects, overwrite_actions):
+def convert_rigify_rig(original_rig, original_mesh, original_actions, root_bone_name, should_overwrite_objects, should_overwrite_actions):
     if not misc.is_rigify_rig(original_rig):
         raise RigConverterException("Can only convert a rigify rig.")
 
@@ -22,34 +22,6 @@ def convert_rigify_rig(original_rig, original_mesh, original_actions, root_bone_
 
     if not bpy.context.mode == "OBJECT":
         bpy.ops.object.mode_set(mode="OBJECT")
-
-    #
-    # Find and remove existing objects with the same names that are being created in this script.
-    #
-
-    if overwrite_objects:
-        pending_removal = set()
-        found_rig_index = bpy.data.objects.find(new_rig_name)
-        if found_rig_index > -1:
-            pending_removal.add(bpy.data.objects[found_rig_index])
-        found_mesh_index = bpy.data.objects.find(new_mesh_name)
-        if found_mesh_index > -1:
-            pending_removal.add(bpy.data.objects[found_mesh_index])
-
-        # Remove objects, including children.
-        for x in pending_removal:
-            for child in x.children:
-                pending_removal.add(child)
-        for x in pending_removal:
-            bpy.data.objects.remove(x)
-        
-        # Remove data.
-        armature_data_index = bpy.data.armatures.find(new_armature_data_name)
-        if armature_data_index > -1:
-            bpy.data.armatures.remove(bpy.data.armatures[armature_data_index])
-        mesh_data_index = bpy.data.meshes.find(new_mesh_data_name)
-        if mesh_data_index > -1:
-            bpy.data.meshes.remove(bpy.data.meshes[mesh_data_index])
 
     #
     # Get bone rolls.
@@ -73,8 +45,59 @@ def convert_rigify_rig(original_rig, original_mesh, original_actions, root_bone_
     #
 
     created_armature_data = bpy.data.armatures.new(new_armature_data_name)
-    created_rig = bpy.data.objects.new(new_rig_name, created_armature_data)
-    bpy.context.scene.collection.objects.link(created_rig)
+
+    created_rig = None
+    found_rig_index = bpy.data.objects.find(new_rig_name)
+    print(f"found_rig_index {found_rig_index}")
+
+    if should_overwrite_objects and found_rig_index > -1:
+        print("Overwriting rig")
+        created_rig = bpy.data.objects[found_rig_index]
+        created_rig.data = created_armature_data
+    else:
+        print("Creating rig")
+        created_rig = bpy.data.objects.new(new_rig_name, created_armature_data)
+        bpy.context.scene.collection.objects.link(created_rig)
+
+    # Remove old data and rename new data.
+    found_data_index = bpy.data.armatures.find(new_armature_data_name)
+    if should_overwrite_objects and found_data_index > -1:
+        bpy.data.armatures.remove(bpy.data.armatures[found_data_index])
+    created_armature_data.name = new_armature_data_name
+
+    #
+    # Create new mesh object.
+    #
+    
+    bpy.ops.object.mode_set(mode="OBJECT")
+
+    new_mesh_data = original_mesh.data.copy()
+
+    created_mesh = None
+    mesh_index = bpy.data.objects.find(new_mesh_name)
+    if should_overwrite_objects and mesh_index > -1:
+        created_mesh = bpy.data.objects[mesh_index]
+        created_mesh.data = new_mesh_data
+    else:
+        created_mesh = bpy.data.objects.new(new_mesh_name, new_mesh_data)
+        bpy.context.scene.collection.objects.link(created_mesh)
+
+    # Remove old data and rename new data.
+    found_data_index = bpy.data.meshes.find(new_mesh_data_name)
+    if should_overwrite_objects and found_data_index > -1:
+        bpy.data.meshes.remove(bpy.data.meshes[found_data_index])
+    new_mesh_data.name = new_mesh_data_name
+
+    # Parent mesh to rig and add armature modifier.
+    created_mesh.parent = created_rig
+    while len(created_mesh.modifiers) > 0:
+        created_mesh.modifiers.remove(created_mesh.modifiers[0])
+    armatue_modifier = created_mesh.modifiers.new(name="Armature", type="ARMATURE")
+    armatue_modifier.object = created_rig
+
+    #
+    # Copy bones to the new rig.
+    #
 
     # Select the new rig.
     bpy.ops.object.select_all(action="DESELECT")
@@ -141,27 +164,6 @@ def convert_rigify_rig(original_rig, original_mesh, original_actions, root_bone_
             edit_bone.parent = root_bone
 
     #
-    # Copy mesh object.
-    #
-
-    bpy.ops.object.mode_set(mode="OBJECT")
-
-    created_mesh = bpy.data.objects.new(new_mesh_name, original_mesh.data.copy())
-    bpy.context.scene.collection.objects.link(created_mesh)
-    created_mesh.data.name = new_mesh_data_name
-
-    # Make linked data local.
-    bpy.ops.object.select_all(action="DESELECT")
-    created_mesh.select_set(True)
-    bpy.context.view_layer.objects.active = created_mesh
-    bpy.ops.object.make_local(type="SELECT_OBDATA")
-
-    # Parent mesh to rig and add armature modifier.
-    created_mesh.parent = created_rig
-    armatue_modifier = created_mesh.modifiers.new(name="Armature", type="ARMATURE")
-    armatue_modifier.object = created_rig
-
-    #
     # Bake actions.
     #
 
@@ -216,7 +218,7 @@ def convert_rigify_rig(original_rig, original_mesh, original_actions, root_bone_
         new_name = f"{old_name}_Converted"
 
         # If an action with the same name exists, remove it.
-        if overwrite_actions:
+        if should_overwrite_actions:
             action_index = bpy.data.actions.find(new_name)
             if action_index > -1:
                 bpy.data.actions.remove(bpy.data.actions[action_index])
