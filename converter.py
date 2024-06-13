@@ -44,7 +44,7 @@ def convert_rigify_rig(original_rig, original_mesh, original_actions, root_bone_
     # Create new rig object.
     #
 
-    created_armature_data = bpy.data.armatures.new(new_armature_data_name)
+    created_armature_data = bpy.data.armatures.new("temp")
 
     created_rig = None
     found_rig_index = bpy.data.objects.find(new_rig_name)
