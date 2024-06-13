@@ -61,6 +61,22 @@ def convert_rigify_rig(original_rig, original_mesh, original_actions, root_bone_
         bpy.data.armatures.remove(bpy.data.armatures[found_data_index])
     created_armature_data.name = new_armature_data_name
 
+    # Make rig object's collection included and visible.
+    def find_layer_collections(object):
+        def find_layer_collections_recursive(layer_collection):
+            result = set()
+            if any(x for x in layer_collection.collection.objects if x == object):
+                result.add(layer_collection)
+            for child in layer_collection.children:
+                for x in find_layer_collections_recursive(child):
+                    result.add(x)
+            return result
+        return find_layer_collections_recursive(bpy.context.view_layer.layer_collection)
+    layer_collections = find_layer_collections(created_rig)
+    for layer_collection in layer_collections:
+        layer_collection.exclude = False
+        layer_collection.hide_viewport = False
+
     #
     # Create new mesh object.
     #
