@@ -209,10 +209,8 @@ def convert_rigify_rig(original_rig, original_mesh, original_actions, root_bone_
         created_rig.animation_data_clear()
         frame_range = (math.floor(action.frame_range[0]), math.ceil(action.frame_range[1]))
 
-        # Select all bones.
+        # Clear transforms for all bones.
         bpy.ops.pose.select_all(action = "SELECT")
-
-        # Clear transforms.
         bpy.ops.pose.loc_clear()
         bpy.ops.pose.rot_clear()
         bpy.ops.pose.scale_clear()
@@ -228,6 +226,12 @@ def convert_rigify_rig(original_rig, original_mesh, original_actions, root_bone_
             use_current_action = False,
             bake_types = {"POSE"}
         )
+
+        # Clear transforms for all bones.
+        bpy.ops.pose.select_all(action = "SELECT")
+        bpy.ops.pose.loc_clear()
+        bpy.ops.pose.rot_clear()
+        bpy.ops.pose.scale_clear()
 
         # Rename the created action.
         old_name = action.name
