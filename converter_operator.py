@@ -105,8 +105,9 @@ class RigifyConverterOperator(bpy.types.Operator):
         for action_property in properties.actions:
             if action_property.name not in [x.name for x in bpy.data.actions]:
                 pending_removal.append(action_property)
-        for x in pending_removal:
-            properties.actions.remove(x)
+        for property_to_remove in pending_removal:
+            i = next(i for (i, x) in enumerate(properties.actions) if x.name == property_to_remove.name)
+            properties.actions.remove(i)
 
         # Add missing actions as new properties.
         for action in bpy.data.actions:

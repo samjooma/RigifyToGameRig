@@ -48,14 +48,10 @@ def convert_rigify_rig(original_rig, original_mesh, original_actions, root_bone_
 
     created_rig = None
     found_rig_index = bpy.data.objects.find(new_rig_name)
-    print(f"found_rig_index {found_rig_index}")
-
     if should_overwrite_objects and found_rig_index > -1:
-        print("Overwriting rig")
         created_rig = bpy.data.objects[found_rig_index]
         created_rig.data = created_armature_data
     else:
-        print("Creating rig")
         created_rig = bpy.data.objects.new(new_rig_name, created_armature_data)
         bpy.context.scene.collection.objects.link(created_rig)
 
