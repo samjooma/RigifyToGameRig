@@ -197,9 +197,8 @@ def convert_rigify_rig(original_rig, original_mesh, original_actions, root_bone_
         new_constraint.target = original_rig
         new_constraint.subtarget = pose_bone.name
     
-    # Store animation data actions.
+    # Store animation data action.
     old_original_rig_action = original_rig.animation_data.action if original_rig.animation_data != None else None
-    old_created_rig_action = created_rig.animation_data.action if created_rig.animation_data != None else None
 
     created_actions = []
     for action in original_actions:
@@ -259,11 +258,9 @@ def convert_rigify_rig(original_rig, original_mesh, original_actions, root_bone_
 
         created_actions.append(created_action)
     
-    # Restore old animation data actions.
+    # Restore old animation data action.
     if original_rig.animation_data != None:
         original_rig.animation_data.action = old_original_rig_action
-    if created_rig.animation_data != None:
-        created_rig.animation_data.action = old_created_rig_action
 
     # Remove constraints
     for pose_bone in created_rig.pose.bones:
