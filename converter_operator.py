@@ -15,12 +15,12 @@ def depsgraph_update_handler(scene):
         rig_property = bpy.context.scene.rigify_converter.rigs_to_convert.add()
         rig_property.rig_object = rig_object
 
-class UIActionList(bpy.types.UIList):
+class RIGIFY_CONVERTER_UL_Action(bpy.types.UIList):
     def draw_item(self, context, layout, data, item, icon, active_data, active_propname):
         if self.layout_type in {"DEFAULT", "COMPACT", "GRID"}:
             row = layout.row(align=True)
             row.alignment = "LEFT"
-            row.prop(data=item, property="include_in_export", icon_only=True)
+            row.prop(data=item, property="include_in_conversion", icon_only=True)
             row.label(text=item.name, icon_value=icon)
 
 #
@@ -29,7 +29,7 @@ class UIActionList(bpy.types.UIList):
 
 class ActionSelectionProperty(bpy.types.PropertyGroup):
     name: bpy.props.StringProperty()
-    include_in_export: bpy.props.BoolProperty(default=False)
+    include_in_conversion: bpy.props.BoolProperty(default=False)
 
 class RigObjectProperty(bpy.types.PropertyGroup):
     rig_object: bpy.props.PointerProperty(type = bpy.types.Object)
@@ -82,7 +82,7 @@ class RigifyConverterOperator(bpy.types.Operator):
             if len(child_meshes) < 1:
                 self.report({"ERROR"}, "Can't convert a rig that is not the parent of any mesh.")
                 return {"CANCELLED"}
-            actions = [bpy.data.actions[x.name] for x in properties.actions if x.include_in_export]
+            actions = [bpy.data.actions[x.name] for x in properties.actions if x.include_in_conversion]
 
             overwrite_objects = properties.overwrite_existing_objects in {"OBJECTS", "BOTH"}
             overwrite_actions = properties.overwrite_existing_objects in {"ACTIONS", "BOTH"}
@@ -122,7 +122,7 @@ class RigifyConverterOperator(bpy.types.Operator):
         properties = bpy.context.scene.rigify_converter
         layout.prop(data=properties, property="add_as_root_bone")
         layout.template_list(
-            listtype_name="UIActionList",
+            listtype_name="RIGIFY_CONVERTER_UL_Action",
             list_id="",
             dataptr=properties,
             propname="actions",
@@ -140,6 +140,7 @@ def menu_func(self, context):
     self.layout.operator(RigifyConverterOperator.bl_idname, text=RigifyConverterOperator.bl_label)
 
 classes = (
+    RIGIFY_CONVERTER_UL_Action,
     ActionSelectionProperty,
     RigObjectProperty,
     RigifyConverterProperties,
