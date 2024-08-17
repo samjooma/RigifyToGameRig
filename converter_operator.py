@@ -124,12 +124,15 @@ class RigifyConverterOperator(bpy.types.Operator):
         properties = context.scene.rigify_converter
         for rig_object in (x for x in context.selected_objects if misc.is_valid_rig(x)):
             child_meshes = [x for x in rig_object.children if x.type == "MESH"]
-
-            if len(child_meshes) > 1:
-                self.report({"ERROR"}, "Can't convert a rig that is the parent of multiple meshes.")
-                return {"CANCELLED"}
             if len(child_meshes) < 1:
                 self.report({"ERROR"}, "Can't convert a rig that is not the parent of any mesh.")
+                return {"CANCELLED"}
+            
+            # If rig contains multiple meshes, only use selected rig.
+            if len(child_meshes) > 1:
+                child_meshes = [x for x in child_meshes if x.select_get()]
+            if len(child_meshes) != 1:
+                self.report({"ERROR"}, "You must select exactly one mesh to be converted when rig contains multiple meshes.")
                 return {"CANCELLED"}
             
             # Check that root bone is valid.
