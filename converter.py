@@ -18,14 +18,36 @@ def convert_rigify_rig(context, original_rig, original_mesh, original_actions, r
     new_mesh_name = f"{original_mesh.name}_Converted"
     new_mesh_data_name = new_mesh_name
 
+    def check_data_type(o, t):
+        if o is not None:
+            actual_type = type(o.data)
+            if actual_type != t:
+                raise TypeError(f"Object {o} was expected to have a data type of {t}, but it was {actual_type}")
+
+    overwrite_rig_object = None
     try:
-        overwrite_rig_object = bpy.data.objects[new_rig_name]
-    except:
-        overwrite_rig_object = None
+        found_object = bpy.data.objects[new_rig_name]
+        if isinstance(found_object, bpy.types.Armature):
+            overwrite_rig_object = found_object
+        else:
+            bpy.data.objects.remove(found_object)
+    except KeyError:
+        pass
+
+    overwrite_mesh_object = None
     try:
-        overwrite_mesh_object = bpy.data.objects[new_mesh_name]
-    except:
-        overwrite_mesh_object = None
+        found_object = bpy.data.objects[new_mesh_name]
+        if isinstance(found_object, bpy.types.Mesh):
+            overwrite_mesh_object = found_object
+        else:
+            bpy.data.objects.remove(found_object)
+    except KeyError:
+        pass
+
+    check_data_type(original_rig, bpy.types.Armature)
+    check_data_type(overwrite_rig_object, bpy.types.Armature)
+    check_data_type(original_mesh, bpy.types.Mesh)
+    check_data_type(overwrite_mesh_object, bpy.types.Mesh)
 
     if not context.mode == "OBJECT":
         bpy.ops.object.mode_set(mode="OBJECT")
@@ -58,7 +80,7 @@ def convert_rigify_rig(context, original_rig, original_mesh, original_actions, r
     #
 
     created_armature_data = bpy.data.armatures.new("temp")
-    if overwrite_rig_object != None:
+    if overwrite_rig_object is not None:
         old_armature_data = overwrite_rig_object.data
         overwrite_rig_object.data = created_armature_data
         created_rig = overwrite_rig_object
@@ -66,7 +88,7 @@ def convert_rigify_rig(context, original_rig, original_mesh, original_actions, r
         created_rig = bpy.data.objects.new(new_rig_name, created_armature_data)
         context.scene.collection.objects.link(created_rig)
 
-    if overwrite_rig_object != None:
+    if overwrite_rig_object is not None:
         bpy.data.armatures.remove(old_armature_data)
     created_rig.data.name = new_armature_data_name
 
@@ -81,7 +103,7 @@ def convert_rigify_rig(context, original_rig, original_mesh, original_actions, r
     #
     
     created_mesh_data = original_mesh.data.copy()
-    if overwrite_mesh_object != None:
+    if overwrite_mesh_object is not None:
         old_mesh_data = overwrite_mesh_object.data
         overwrite_mesh_object.data = created_mesh_data
         created_mesh = overwrite_mesh_object
@@ -89,7 +111,7 @@ def convert_rigify_rig(context, original_rig, original_mesh, original_actions, r
         created_mesh = bpy.data.objects.new(new_mesh_name, created_mesh_data)
         context.scene.collection.objects.link(created_mesh)
 
-    if overwrite_mesh_object != None:
+    if overwrite_mesh_object is not None:
         bpy.data.meshes.remove(old_mesh_data)
     created_mesh.data.name = new_mesh_data_name
 
