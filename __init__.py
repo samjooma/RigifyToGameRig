@@ -1,20 +1,20 @@
 bl_info = {
-    "name": "Rigify to game rig converter",
-    "description": "Converts a rigify rig and its animations into a basic rig compatible with game engines",
+    "name": "Simple Rigify Duplication",
+    "description": "Create a simplified duplicate of a Rigify armature and make the new armature follow the transformations of the original",
     "author": "Samjooma",
     "version": (1, 0, 0),
-    "blender": (4, 1, 0),
+    "blender": (4, 4, 1),
     "category": "Rigging"
 }
 
 import bpy
-from . import converter_operator
+from . import duplicator_operator
 
 def register():
-    converter_operator.register()
+    duplicator_operator.register()
 
 def unregister():
-    converter_operator.unregister()
+    duplicator_operator.unregister()
 
 if __name__ == "__main__":
     register()
