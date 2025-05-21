@@ -1,1 +1,1 @@
-Blender plugin that converts a rigify rig into a basic rig that is compatible with game engines such as Unreal Engine.
+Blender plugin that creates a simplified duplicate of a Rigify armature that follows the transformations of the original.
